@@ -1,0 +1,10 @@
+temp/
+results/
+go_metadata/
+__pycache__/
+
+
+.DS_Store
+*.jpg
+*.csv
+
