@@ -1,4 +1,4 @@
-name: base
+name: toden_e
 channels:
   - defaults
 dependencies:
@@ -470,4 +470,4 @@ dependencies:
       - wsproto==1.2.0
       - yarl==1.9.2
       - youtube-dl==2021.12.17
-prefix: /Users/qi/anaconda3
+

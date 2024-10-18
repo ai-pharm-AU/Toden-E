@@ -19,8 +19,8 @@ from sklearn.svm import SVC
 from sklearn.neighbors import KNeighborsClassifier
 
 
-# ALGORITHMS = ['louvain', 'girvan_newman', 'spectral_clustering', 'agglomerative_clustering']
-ALGORITHMS = ['agglomerative_clustering']
+ALGORITHMS = ['louvain', 'girvan_newman', 'spectral_clustering', 'agglomerative_clustering']
+# ALGORITHMS = ['agglomerative_clustering']
 def plot_communities_w_names(G, partition, title=""):
     cmap = plt.get_cmap('Pastel1')  # Corrected method to get colormap
     plt.figure(figsize=(8, 8))
@@ -41,17 +41,35 @@ def plot_communities_w_names(G, partition, title=""):
     plt.axis('off')
     plt.savefig(f"{title.replace(' ', '_')}_results.jpg", dpi=300)  # Adjusted DPI for better image quality
 
-def plot_communities(G, partition, title=""):
-    cmap = plt.colormaps.get_cmap('viridis')
+
+def plot_communities(G, partition, title="", node_size=40, edge_width=1.0):
+    title_fontsize = 18
+
+    cmap = plt.colormaps.get_cmap('tab10')  # Get the colormap
     plt.figure(figsize=(8, 8))
-    pos = nx.spring_layout(G, seed=42)
-    nx.draw_networkx_nodes(G, pos, partition.keys(), node_size=40,
-                           cmap=cmap, node_color=list(partition.values()))
-    nx.draw_networkx_edges(G, pos, alpha=0.5)
-    plt.title(title)
-    plt.axis('off')
-    plt.savefig(f"{title.replace(' ', '_')}_results.jpg")
-    plt.close()  # Close the plot to avoid displaying it inline if not desired
+    pos = nx.spring_layout(G, seed=42)  # Layout for positioning nodes
+    
+    # Plot the nodes with customizable node size
+    nx.draw_networkx_nodes(
+        G, pos, 
+        nodelist=partition.keys(), 
+        node_size=node_size,  # Control node size
+        cmap=cmap, 
+        node_color=list(partition.values())
+    )
+    
+    # Plot the edges with customizable edge width
+    nx.draw_networkx_edges(
+        G, pos, 
+        alpha=0.5, 
+        width=edge_width  # Control edge width
+    )
+    
+    plt.title(title, fontsize = title_fontsize)
+    plt.axis('off')  # Turn off axis
+    plt.savefig(f"{title.replace(' ', '_')}_results.jpg")  # Save the figure
+    plt.close()  # Close the plot
+
 
 def evaluate_algorithm(true_labels, pred_labels):
     ari = adjusted_rand_score(true_labels, pred_labels)
@@ -70,7 +88,7 @@ def generate_sbm_graph(sizes, p_within, p_between):
     return G, true_labels
 
 
-def run_eval(algorithm, G, true_labels, is_plot=False):
+def run_eval(algorithm, G, true_labels, is_plot=True, node_size=40, edge_width=1.0):
     
     if algorithm == 'louvain':
         partition = community_louvain.best_partition(G)
@@ -81,13 +99,13 @@ def run_eval(algorithm, G, true_labels, is_plot=False):
         title = "Girvan-Newman Algorithm"
     elif algorithm == 'spectral_clustering':
         adj_matrix = nx.to_numpy_array(G)
-        sc = SpectralClustering(n_clusters=2, affinity='precomputed', n_init=100, random_state=42)
+        sc = SpectralClustering(n_clusters=3, affinity='precomputed', n_init=100, random_state=42)
         sc.fit(adj_matrix)
         partition = {i: sc.labels_[i] for i in range(len(G.nodes()))}
         title = "Spectral Clustering"
     elif algorithm == "agglomerative_clustering":
         adj_matrix = nx.to_numpy_array(G)
-        ac = AgglomerativeClustering(n_clusters=2, affinity='euclidean', linkage='ward')
+        ac = AgglomerativeClustering(n_clusters=3, affinity='euclidean', linkage='ward')
         ac.fit(adj_matrix)
         partition = {i: ac.labels_[i] for i in range(len(G.nodes()))}
         title = "Agglomerative Clustering"
@@ -102,27 +120,55 @@ def run_eval(algorithm, G, true_labels, is_plot=False):
 
     if is_plot:
         print(f"{title}: ARI = {ari}, NMI = {nmi}")
-        plot_communities(G, partition, title)
+        print(partition)
+        plot_communities(G, partition, title=title, node_size=node_size, edge_width=edge_width)
 
     return ari, nmi
 
 # Function to plot heatmap for given metric ('ARI' or 'NMI')
 def plot_heatmap_for_metric(metric, results_df, prefix = "sbm_50_50"):
-    for alg in ALGORITHMS:
+    label_fontsize = 18
+    font_size = 16
+    annot_font_size = 16
+    colorbar_font_size = 16
+
+    for alg in results_df['Algorithm'].unique():
         # Filter DataFrame for the current algorithm
-        alg_data = results_df[results_df['Algorithm'] == alg]
+        alg_data = results_df[results_df['Algorithm'] == 'spectral_clustering']
         
         # Pivot the data to get a matrix where rows are p_within, columns are p_between, and values are the metric
-        pivot_table = alg_data.pivot("p_within", "p_between", metric)
+        pivot_table = alg_data.pivot(index="p_within", columns="p_between", values=metric)
         
-        # Plotting
+        # Convert the data to numeric in case there are any non-numeric values
+        pivot_table = pivot_table.apply(pd.to_numeric, errors='coerce')
+
+        pivot_table = pivot_table.round(2)
+
+        pivot_table = pivot_table.fillna(0) 
+
+        mask = np.triu(np.ones_like(pivot_table, dtype=bool))
+    
+        print(pivot_table)
+
+
+        # Plotting the heatmap
         plt.figure(figsize=(10, 8))
-        sns.heatmap(pivot_table, annot=True, cmap="coolwarm", fmt=".2f")
-        plt.title(f"{alg.capitalize()} - {metric}")
-        plt.ylabel('p_within')
-        plt.xlabel('p_between')
+        heatmap = sns.heatmap(
+            pivot_table, annot=True, cmap="coolwarm", fmt=".2f", mask=mask, cbar=True,
+            annot_kws={"size": annot_font_size}  # Control the font size of the annotation
+        )
+        
+        # Modify the font of the color bar (color scale)
+        colorbar = heatmap.collections[0].colorbar
+        colorbar.ax.yaxis.set_tick_params(labelsize=colorbar_font_size)  
+        # plt.title(f"{alg.capitalize()} - {metric}")
+        plt.ylabel('Intra-cluster connection probability', fontsize=label_fontsize)
+        plt.xlabel('Inter-cluster connection probability', fontsize=label_fontsize)
+        plt.xticks(fontsize=font_size)  # Change font size for x-axis
+        plt.yticks(fontsize=font_size)  # Ch
+        plt.tight_layout()  # Ensure the layout fits well
         plt.savefig(f"{prefix}_{alg}_{metric}_heatmap.jpg")
-        plt.show()
+        plt.close()  # Close the figure to avoid inline display if not needed
 
 def find_edges_among_neighbors(G, target_vertex):
     """
@@ -177,7 +223,7 @@ def eval_cross_all_for_3_methods(args):
 
 def plot_heatmaps(clustering_result_file, exp):
     results_df = pd.read_csv(clustering_result_file)
-    for metric in ['ARI', 'NMI']:
+    for metric in ['ARI']: #, 'NMI'
         plot_heatmap_for_metric(metric, results_df, exp)
 
 
@@ -417,18 +463,27 @@ def main():
     parser = argparse.ArgumentParser(description ='Community detection!!')
     parser.add_argument('--alg', type=str, default="louvain", help ='the algorithm to be evaluated.')
     parser.add_argument('--sizes', nargs='+', type=int, help='List of sizes (integers).')
-    parser.add_argument('--p_within', type=int, default=0.5, help ='the probability of edge creation within a cluster.')
-    parser.add_argument('--p_between', type=int, default=0.1, help ='the probability for edge creation between the clusters. ')
+    parser.add_argument('--p_within', type=float, default=0.3, help ='the probability of edge creation within a cluster.')
+    parser.add_argument('--p_between', type=float, default=0.1, help ='the probability for edge creation between the clusters. ')
     args = parser.parse_args()
 
     # multiple evaluations 
     print(args.sizes)
-    # # exp = f"sbm_{'_'.join(str(item) for item in args.sizes)}"
-    # # save_csv_name = f'{exp}_distribution_of_connection_results.csv'
-    # exp, save_csv_name = eval_cross_all_for_3_methods(args)
+    # exp = f"sbm_{'_'.join(str(item) for item in args.sizes)}"
+    # save_csv_name = f'{exp}_distribution_of_connection_results.csv'
+    # save_csv_name = f'{exp}_clustering_results.csv'
+    # exp = f"sbm_{'_'.join(str(item) for item in args.sizes)}"
     # plot_heatmaps(save_csv_name, exp)
 
+    # algorithm = args.alg
 
+    for algo in ['louvain', 'girvan_newman', 'spectral_clustering']: # 
+        G, true_labels = generate_sbm_graph(args.sizes, args.p_within, args.p_between)
+        print(true_labels)
+        ground_truth_partition = dict(enumerate(true_labels))
+        # print(ground_truth_partition)
+        plot_communities(G, ground_truth_partition, title="Ground Truth", node_size=100, edge_width=0.4)
+        ari, nmi = run_eval(algo, G, true_labels, is_plot=True, node_size=100, edge_width=0.4)
     
     # generate_all_sbm_graphs(args.sizes)
     # df = pd.read_csv(save_csv_name)
@@ -437,9 +492,9 @@ def main():
     # merge_clustering_results()
 
     # train_two_group_dist_model()
-    banary_classifier = [ 'knn'] # 'logistic_regression' , 'svm', 'reandom_forest',
-    for method in banary_classifier:
-        train_binary_two_group_dist_group(method=method)
+    # banary_classifier = [ 'knn'] # 'logistic_regression' , 'svm', 'reandom_forest',
+    # for method in banary_classifier:
+    #     train_binary_two_group_dist_group(method=method)
 
     # for algo in ['louvain', 'girvan_newman', 'spectral_clustering']:
     #     plot_distribution_train(algo=algo)
