@@ -423,8 +423,6 @@ def plot_distribution_train(csv_path = "synthetic_exp_distribution_results.csv",
     df = pd.read_csv(csv_path)
     df_sc = df[df['Algorithm'] == algo]
 
-    
-
     def to_float_list(value):
         # If the value is a string representation of a list, convert it to a list
         if isinstance(value, str):

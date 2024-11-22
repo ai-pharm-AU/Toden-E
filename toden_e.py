@@ -11,6 +11,7 @@ import seaborn as sns
 import argparse
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
+import torch
 
 from transformers import pipeline, GPT2Tokenizer, GPT2LMHeadModel, GPT2TokenizerFast
 from scipy.stats import ttest_ind
@@ -1024,8 +1025,6 @@ def summarize_chunk(text, chunk_size, summarizer):
 
 def summarize_cluster_results(clusering_results_path= "real_data_clustering_results.csv"):
     
-    # generator = pipeline('text-generation', model='gpt2')
-    # Initialize the model and tokenizer
     max_length = 1024  # Adjust as needed
     df = pd.read_csv(clusering_results_path)
     df_desc = pd.read_csv(META_DATA_PATH)
@@ -1060,8 +1059,6 @@ def summarize_cluster_results(clusering_results_path= "real_data_clustering_resu
         save_path = f"{algo}_{save_name}_cluster_summarizatoin.csv"
         df_result.to_csv(save_path, index=False)
         print(results_dict)
-
-
 
 
 def visulize_pred_results(G_path= "2024_biological_process_graph_w_verification.graphml", pred_dict_path= "real_data_clustering_results.csv"):
@@ -1622,9 +1619,9 @@ def analyze_zoomin_outdegree(G_path='2024_biological_process_graph_w_verificatio
     return filtered_outdegrees
 
 
-def toden_e_predict(pags_txt_path = "Leukemia_drug_resistantVSsensitive.txt", alpha = 0.5, num_clusters=2, is_visualized=False):
+def toden_e_predict(pags_txt_path = "Leukemia_drug_resistantVSsensitive.txt", alpha = 0.5, num_clusters=2, is_visualized=False, is_summary=False):
 
-    
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     # Read gene names from a text file into a list
     with open(pags_txt_path, 'r') as file:
         valid_nodes = [line.strip() for line in file if line.strip()]  # Read lines and strip whitespace
@@ -1671,22 +1668,42 @@ def toden_e_predict(pags_txt_path = "Leukemia_drug_resistantVSsensitive.txt", al
     if is_visualized:
         visulize_pred_results(pred_dict_path= save_file_path)
 
+    if is_summary:
+        summarize_cluster_results(clusering_results_path= save_file_path)
 
-
-def main():
-
-    parser = argparse.ArgumentParser(description ='LLM embedding clustering')
-    parser.add_argument('--num', type=int, default=2, help ='the number of groups for the evaluation')
-    parser.add_argument('--file_path', type=str, default="Leukemia_drug_resistantVSsensitive.txt", help ='the path to a txt file including a list of gene names. ')
-    
-    args = parser.parse_args()
-    toden_e_predict(pags_txt_path = args.file_path, num_clusters=args.num)
+def compute_partition_score():
+    pass
 
 
 
 if __name__ == "__main__":
 
-    main()
+    parser = argparse.ArgumentParser(description='Toden-E Predict Functionality')
+    parser.add_argument('--func', type=str, required=True, help='Functionality to execute: visualize or partition_score')
+    parser.add_argument('--file_path', type=str, default="gene_names.txt", help='Path to the text file containing gene names.')
+    parser.add_argument('--clusering_results_path', type=str, default="toden_predict_results.csv", help='Path to the toden-e results.')
+    parser.add_argument('--alpha', type=float, default=0.5, help='Alpha parameter for clustering.')
+    parser.add_argument('--num_clusters', type=int, default=2, help='Number of clusters for partitioning.')
+    parser.add_argument('--is_visualized', action='store_true', help='Flag to indicate if visualization is required.')
+
+    args = parser.parse_args()
+
+    if args.func == "visualize":
+        # Call the visualization function
+        visulize_pred_results(pred_dict_path= args.clusering_results_path) 
+    elif args.func == "partition_score":
+        # Call the partition score function
+        partition_score_results = compute_partition_score()  # Replace with your actual partition function
+    elif args.func == "super_pag":
+        toden_e_predict(txt_file_path=args.file_path, alpha=args.alpha, num_clusters=args.num_clusters, is_visualized=args.is_visualized)
+
+    elif args.func == "summerization":
+        summarize_cluster_results(clusering_results_path= args.clusering_results_path)
+    else:
+        # Default behavior or error handling
+        print("Invalid function specified. Please use 'visualize' or 'partition_score'.")
+
+
    
 
 

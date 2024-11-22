@@ -34,6 +34,26 @@ conda activate toden_e
 1) Discover the super-pags with a list of gene:
 
 ```python
-python toden_e.py --file_path file_name.txt
+python toden_e.py --func super_pag --file_path file_name.txt
 ```
 
+2) Compute the Dipartion Score: 
+
+```
+python toden_e.py --func dipartion_score --file_path file_name.txt
+
+```
+
+3) Visualizaiton for the super-pags
+
+```
+python toden_e.py --func vis --clusering_results_path predict_results.csv
+
+```
+
+4) Summerization for the super-pags
+
+```
+python toden_e.py --func summerization --clusering_results_path predict_results.csv
+
+```
